@@ -137,7 +137,7 @@ public class Server   extends Thread{
 		{
 			//1. creating a server socket, parameter is local port number
 			sock = new DatagramSocket(Integer.parseInt(puerto));
-
+			sock.setReceiveBufferSize(64000);
 			//buffer to receive incoming data
 
 
@@ -170,12 +170,6 @@ public class Server   extends Thread{
 					tamanio=Integer.parseInt(tamano);
 					byte[] receiveData = new byte[tamanio];
 					for (int i = 0; i < receiveData.length; i++) {
-						try {
-							this.sleep(100);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
 						if((receiveData.length-i)>= 64000){
 							
 							DatagramPacket  receivePacket = new DatagramPacket(receiveData, i,64000 );
