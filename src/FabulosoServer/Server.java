@@ -20,20 +20,24 @@ public class Server   extends Thread{
 	private FileWriter archivo;
 	private String archivoNombre;
 	private String checksum;
+	private int tamanio;
+	private boolean recibiendo;
 
 
 	public Server (String pPuerto)
 	{	
 		puerto = pPuerto;
 		info = new ArrayList<Client>();
+		recibiendo=false;
 		this.start();
 
+
 	}
-	
+
 	public ArrayList<Client> getarr()
 	{
 		return info;
-		
+
 	}
 	public boolean clientExits(String pCliente)
 	{
@@ -58,7 +62,7 @@ public class Server   extends Thread{
 			String savestr = ip.replace(".", " ") +".csv";
 			File f = new File(savestr);
 			System.out.println(f.getAbsolutePath());
-			out = new PrintWriter(savestr);	    out.append("Id,Tiempo");
+			out = new PrintWriter(savestr);			out.append("Id,Tiempo");
 			out.append('\n');
 			out.close();
 		}catch (Exception x)
@@ -69,7 +73,7 @@ public class Server   extends Thread{
 	}
 	public void addRecibido(String ip,String texto, int something,int numero)
 	{
-		
+
 		for (int i = 0; i < info.size(); i++) {
 			Client cliente =info.get(i);
 			if(cliente.getIpAddres().equals(ip))	
@@ -96,26 +100,26 @@ public class Server   extends Thread{
 					e.printStackTrace();
 				}
 
-			
+
 				try {
 					PrintWriter out;
 					String savestr = ip.replace(".", " ") + " estadisticas"+".csv";
 					File f = new File(savestr);
 					System.out.println(f.getAbsolutePath());
 					out = new PrintWriter(savestr);
-			        out.append("Objetos Recibidos,Objetos Fallidos,Tiempo Promedio");
+					out.append("Objetos Recibidos,Objetos Fallidos,Tiempo Promedio");
 					out.append('\n');
 					System.out.println("FALLIDOS"+cliente.getObjetosFallidos());
 					System.out.println("cantidad"+cliente.getCantidad());
-			        out.append(cliente.getObjetosRecibidos()+","+cliente.getObjetosFallidos()+","+cliente.getTiempoPromedio()+ "ms");
+					out.append(cliente.getObjetosRecibidos()+","+cliente.getObjetosFallidos()+","+cliente.getTiempoPromedio()+ "ms");
 					out.close();
-					} catch (FileNotFoundException e) 
-					{
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-				
-				
+				} catch (FileNotFoundException e) 
+				{
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
+
 
 			}	
 		}
@@ -135,7 +139,7 @@ public class Server   extends Thread{
 			sock = new DatagramSocket(Integer.parseInt(puerto));
 
 			//buffer to receive incoming data
-		
+
 
 			//2. Wait for an incoming data
 			//   echo("Server socket created. Waiting for incoming data...");
@@ -156,61 +160,79 @@ public class Server   extends Thread{
 					addClient(nombre);
 				}
 				String llegada = new String (recibido);
-
+				System.out.println(llegada);
 				//Coje lo de llegada asociado al archivo
-				if (llegada.startsWith("archivo:"))
+				if (llegada.startsWith("ARCHIVO:"))
 				{
 					archivoNombre = llegada.split(":")[1];
-					archivo=new FileWriter(llegada.split(":")[1]);
 					checksum = llegada.split(":")[2];
-				
-					
-					
-					
-				}
-				else if ( llegada.startsWith("final"))
-				{
-				    MessageDigest md;
+					String tamano= llegada.split(":")[3];
+					tamanio=Integer.parseInt(tamano);
+					byte[] receiveData = new byte[tamanio];
+					for (int i = 0; i < receiveData.length; i++) {
+						try {
+							this.sleep(100);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						if((receiveData.length-i)>= 64000){
+							
+							DatagramPacket  receivePacket = new DatagramPacket(receiveData, i,64000 );
+							sock.receive(receivePacket);
+							System.out.println("llega");
+							i+=(64000-1);
+							System.out.println("recibidos "+i+" bytes del archivo...");
+						}
+						else{
+							DatagramPacket  receivePacket = new DatagramPacket(receiveData, i,receiveData.length-i);
+							sock.receive(receivePacket);
+							System.out.println("recibido ultimo paquete de"+(i+(receiveData.length-i))+" bytes del archivo.");
+							i+=(64000-1);
+
+
+						}
+					}
+					FileOutputStream fos = new FileOutputStream("./"+archivoNombre);
+					fos.write(receiveData);
+					fos.close();
+
+					MessageDigest md;
 					try {
 						md = MessageDigest.getInstance("SHA1");
-				
-					archivo.close();
 
-				    FileInputStream fis = new FileInputStream(archivoNombre);
 
-				    byte[] dataBytes = new byte[1024];
 
-				    int nread = 0;
+						FileInputStream fis = new FileInputStream(archivoNombre);
 
-				    while ((nread = fis.read(dataBytes)) != -1) {
-				      md.update(dataBytes, 0, nread);
-				    };
+						byte[] dataBytes = new byte[1024];
 
-				    byte[] mdbytes = md.digest();
+						int nread = 0;
 
-				    //convert the byte to hex format
-				    StringBuffer sb = new StringBuffer("");
-				    for (int i = 0; i < mdbytes.length; i++) {
-				    	sb.append(Integer.toString((mdbytes[i] & 0xff) + 0x100, 16).substring(1));
-				    }
+						while ((nread = fis.read(dataBytes)) != -1) {
+							md.update(dataBytes, 0, nread);
+						};
 
-				    System.out.println("Digest(in hex format):: " + sb.toString());
-				    
+						byte[] mdbytes = md.digest();
+
+						//convert the byte to hex format
+						StringBuffer sb = new StringBuffer("");
+						for (int i = 0; i < mdbytes.length; i++) {
+							sb.append(Integer.toString((mdbytes[i] & 0xff) + 0x100, 16).substring(1));
+						}
+
+						System.out.println("Digest(in hex format):: " + sb.toString()+ "is equal to"+checksum);
+
 					} catch (NoSuchAlgorithmException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 
-					
-					
-				}
-				else
-				{
-				
-				Conexion papitas = new Conexion(sock,recibido,this,nombre,archivo);
-				}
 
+				}
 			}
+
+
 		}
 
 		catch(IOException e)
@@ -243,12 +265,12 @@ public class Server   extends Thread{
 
 
 
-	}	
+	}
 
 
 
 }
 
-	
+
 
 
